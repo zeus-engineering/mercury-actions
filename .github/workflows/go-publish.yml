@@ -1,0 +1,104 @@
+name: Reusable — Go module publish
+
+# Reusable workflow that tags the caller's repo with a semver tag,
+# making its Go module (or sub-packages) consumable via:
+#
+#   go get github.com/<owner>/<repo>@vX.Y.Z
+#
+# Caller pattern (caller's repo, .github/workflows/release.yml):
+#
+#   name: Release
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         bump: { type: choice, options: [patch, minor, major], default: patch }
+#         dry_run: { type: boolean, default: false }
+#   jobs:
+#     publish:
+#       uses: zeusml-ai/mercury-actions/.github/workflows/go-publish.yml@main
+#       with:
+#         bump: ${{ inputs.bump }}
+#         dry_run: ${{ inputs.dry_run }}
+#       permissions:
+#         contents: write
+
+on:
+  workflow_call:
+    inputs:
+      bump:
+        description: 'patch | minor | major'
+        type: string
+        required: true
+      dry_run:
+        description: 'Compute next tag but skip push'
+        type: boolean
+        default: false
+      tag_prefix:
+        description: 'Prefix before MAJOR.MINOR.PATCH (e.g. "v" or "pkg/foo/v" for submodule)'
+        type: string
+        default: 'v'
+    outputs:
+      tag:
+        description: 'The tag that was created (or would have been on dry-run)'
+        value: ${{ jobs.tag.outputs.tag }}
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.ver.outputs.next }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history + tags
+
+      - name: Compute next version
+        id: ver
+        run: |
+          set -eu
+          prefix='${{ inputs.tag_prefix }}'
+          # List existing tags matching prefix + semver, pick the highest.
+          latest=$(git tag --list "${prefix}[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | head -1 || true)
+          if [ -z "$latest" ]; then
+            latest="${prefix}0.0.0"
+          fi
+          base="${latest#${prefix}}"
+          IFS='.' read -r maj min pat <<<"$base"
+          case "${{ inputs.bump }}" in
+            major) maj=$((maj+1)); min=0;  pat=0 ;;
+            minor) min=$((min+1)); pat=0 ;;
+            patch) pat=$((pat+1)) ;;
+            *) echo "::error::bump must be patch|minor|major, got '${{ inputs.bump }}'"; exit 1 ;;
+          esac
+          next="${prefix}${maj}.${min}.${pat}"
+          echo "latest=$latest" >>"$GITHUB_OUTPUT"
+          echo "next=$next"     >>"$GITHUB_OUTPUT"
+          echo "## Release plan" >>"$GITHUB_STEP_SUMMARY"
+          echo ""                >>"$GITHUB_STEP_SUMMARY"
+          echo "- Latest tag: \`$latest\`" >>"$GITHUB_STEP_SUMMARY"
+          echo "- Next tag:   \`$next\`"   >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Tag and push
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          set -eu
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.next }}" -m "Release ${{ steps.ver.outputs.next }}"
+          git push origin "${{ steps.ver.outputs.next }}"
+          echo "" >>"$GITHUB_STEP_SUMMARY"
+          echo "✅ Pushed \`${{ steps.ver.outputs.next }}\`" >>"$GITHUB_STEP_SUMMARY"
+          echo "" >>"$GITHUB_STEP_SUMMARY"
+          echo "Consumers can now:" >>"$GITHUB_STEP_SUMMARY"
+          echo "" >>"$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >>"$GITHUB_STEP_SUMMARY"
+          echo "go get github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}@${{ steps.ver.outputs.next }}" >>"$GITHUB_STEP_SUMMARY"
+          echo "\`\`\`" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Dry-run note
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          echo "" >>"$GITHUB_STEP_SUMMARY"
+          echo "🟡 Dry run — would have pushed \`${{ steps.ver.outputs.next }}\`" >>"$GITHUB_STEP_SUMMARY"
