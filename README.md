@@ -6,7 +6,7 @@
 
 | Workflow | Purpose | Caller invokes via |
 |---|---|---|
-| `.github/workflows/go-publish.yml` | Tag the caller's repo with a semver tag so its Go module / sub-packages are consumable via `go get` | `uses: zeusml-ai/mercury-actions/.github/workflows/go-publish.yml@main` |
+| `.github/workflows/go-publish.yml` | Tag the caller's repo with a semver tag so its Go module / sub-packages are consumable via `go get` | `uses: zeus-engineering/mercury-actions/.github/workflows/go-publish.yml@main` |
 
 More to come (npm-publish, container-publish, ...).
 
@@ -33,7 +33,7 @@ jobs:
   publish:
     permissions:
       contents: write
-    uses: zeusml-ai/mercury-actions/.github/workflows/go-publish.yml@main
+    uses: zeus-engineering/mercury-actions/.github/workflows/go-publish.yml@main
     with:
       bump: ${{ inputs.bump }}
       dry_run: ${{ inputs.dry_run }}
@@ -47,7 +47,7 @@ For private Zeus repos, Go needs to bypass the public module proxy and authentic
 
 ```yaml
 env:
-  GOPRIVATE: github.com/zeusml-ai/*
+  GOPRIVATE: github.com/zeus-engineering/*
   GH_TOKEN: ${{ secrets.Z_GITHUB_API_TOKEN }}
 steps:
   - run: git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
@@ -56,7 +56,7 @@ steps:
 In **local dev** (run once per machine):
 
 ```sh
-export GOPRIVATE='github.com/zeusml-ai/*'   # add to ~/.zshrc
+export GOPRIVATE='github.com/zeus-engineering/*'   # add to ~/.zshrc
 gh auth refresh --scopes repo                # personal token must have repo scope
 git config --global url."https://oauth2:$(gh auth token)@github.com/".insteadOf "https://github.com/"
 ```

@@ -15,7 +15,7 @@ name: Reusable — Go module publish
 #         dry_run: { type: boolean, default: false }
 #   jobs:
 #     publish:
-#       uses: zeusml-ai/mercury-actions/.github/workflows/go-publish.yml@main
+#       uses: zeus-engineering/mercury-actions/.github/workflows/go-publish.yml@main
 #       with:
 #         bump: ${{ inputs.bump }}
 #         dry_run: ${{ inputs.dry_run }}
